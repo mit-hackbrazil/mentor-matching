@@ -1,0 +1,3 @@
+team1,area1
+team2,area2
+team3,area3
