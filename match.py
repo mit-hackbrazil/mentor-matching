@@ -11,7 +11,7 @@ gflags.DEFINE_string('mentors', 'test/mentors.txt', 'Mentors info file.')
 gflags.DEFINE_string('teams', 'test/teams.txt', 'Teams info file.')
 
 class Mentor:
-    def __init__(self, name, areas, preferences):
+    def __init__(self, name, areas, preferences, nteams):
         self.name = name
         self.areas = areas
         self.preferences = preferences
@@ -21,6 +21,7 @@ class Mentor:
             "Times com soluções prontas e que já tem faturamento": 2,
         }
         self.preferences = [switcher[p] for p in preferences]
+        self.nteams = int(nteams)
 
     def __str__(self):
         return self.name
@@ -66,7 +67,8 @@ def extract_mentors(mentors_file):
         name = tks[1]
         preferences = tks[6].split(";")
         areas = tks[10].split(";")
-        mentor = Mentor(name, areas, preferences)
+        nteams = tks[7]
+        mentor = Mentor(name, areas, preferences, nteams)
         mentors.append(mentor)
 
     return mentors
@@ -107,8 +109,8 @@ def make_graph(mentors, teams):
 
     # TODO: mentors can have multiple teams
     for m in mentors:
-        graph[(m, "dst")] = edmonds_karp.Edge(1, 0)
-        graph[("dst", m)] = edmonds_karp.Edge(1, 1)
+        graph[(m, "dst")] = edmonds_karp.Edge(m.nteams, 0)
+        graph[("dst", m)] = edmonds_karp.Edge(m.nteams, m.nteams)
 
     return graph
 
