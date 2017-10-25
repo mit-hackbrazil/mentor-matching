@@ -3,19 +3,22 @@
 Esse programa match mentores e equipes da HackBrazil baseado nas seguintes variáveis:
 
 - área de atuação das equipes;
+- estágio do projeto da equipe;
 - áreas de expertise dos mentores; e
-- preferências dos mentores para cada equipe
+- preferências dos mentores
+
+Cada equipe recebe 2 mentores, e mentores podem especificar um número máximo de
+equipes para mentorar.
 
 ## Algoritmo
 
 Tratando o problema como um problema de fluxo máximo, onde existe mentores e equipes
 são nodos e existe um arco entre uma equipe `t` e um mentor `m`, se e somente se, o
-mentor `m` tem expertise na área de atuação de `t`. Além disso, as preferências dos
-mentores para cada equipe servem como peso para a capacidade do arco entre o
-mentor e a equipe.
+mentor `m` tem expertise na área de atuação de `t` e o estágio do projeto está dentro
+das preferências dos mentores.
 
 Usando o algoritmo de [Edmonds-Karp](https://pt.wikipedia.org/wiki/Algoritmo_de_Edmonds-Karp),
-achamos o matching que maximiza as preferências globais dos mentores, garantindo que
+achamos o matching que satisfaz as preferências dos mentores e que garante que
 cada equipe receba um mentor dentro da sua área de atuação.
 
 ## Modo de usar
@@ -23,17 +26,3 @@ cada equipe receba um mentor dentro da sua área de atuação.
 ```
 python match.py --mentors mentors.txt --teams teams.txt
 ```
-
-onde `teams.txt` contém as áreas de atuações dos times no formato
-```
-team1,area1
-team2,area2
-```
-
-e `mentors.txt` contém as áreas de expertise dos times no formato
-```
-mentor1,area1,area2
-mentor2,area2,area3,area4
-```
-
-
