@@ -7,23 +7,35 @@ import os
 import edmonds_karp
 
 FLAGS = gflags.FLAGS
-gflags.DEFINE_string('mentors', 'test/mentors.txt', 'Mentors info file.')
-gflags.DEFINE_string('teams', 'test/teams.txt', 'Teams info file.')
+gflags.DEFINE_string('mentors', 'mentors.txt', 'Mentors info file.')
+gflags.DEFINE_string('teams', 'teams.txt', 'Teams info file.')
+gflags.DEFINE_string('initial', 'initial.txt', 'Initial matches.')
+
+MENTORS_PER_TEAM = 2
+MAX_TEAMS_PER_MENTOR = 2
 
 class Mentor:
     def __init__(self, name, areas, preferences, nteams):
         self.name = name
         self.areas = areas
-        self.preferences = preferences
+        self.preferences = []
         switcher = {
             "Times com idéia inicial , sem plano de negócios ou protótipo": 0,
             "Times um pouco mais avançados, mas ainda com desafios para lançar o produto no mercado": 1,
             "Times com soluções prontas e que já tem faturamento": 2,
         }
-        self.preferences = [switcher[p] for p in preferences]
+
+        for k in switcher:
+            if preferences.find(k) >= 0:
+                self.preferences.append(switcher[k])
+
         self.nteams = int(nteams)
+        self.match = 0
 
     def __str__(self):
+        return self.name
+
+    def __repr__(self):
         return self.name
 
 class Team:
@@ -41,22 +53,27 @@ class Team:
             "Lançado no mercado"                    : 2,
         }
         self.stage = switcher[stage]
+        self.nmentors = MENTORS_PER_TEAM
+        self.match = 0
 
     def __str__(self):
+        return self.name
+
+    def __repr__(self):
         return self.name
 
 def usage():
     print("python match.py --mentors [mentors_file] --teams [teams_file]")
 
-def read_file(file):
+def read_file(file, start):
     if not os.path.isfile(file):
         print("File doesn't exist: `%s`" % file)
         sys.exit(1)
-    return open(file, 'r').read().splitlines()[1:] # skip header line
+    return open(file, 'r').read().splitlines()[start:]
 
 def extract_mentors(mentors_file):
-    lines = read_file(mentors_file)
-    mentors = []
+    lines = read_file(mentors_file, 1)
+    mentors = {}
     for (i, m) in enumerate(lines):
         tks = m.split("\t")
         if len(tks) != 14:
@@ -64,38 +81,52 @@ def extract_mentors(mentors_file):
             print("Can't parse line %s in file `%s`" % (i, mentors_file))
             sys.exit(1)
 
-        name = tks[1]
-        preferences = tks[6].split(";")
-        areas = tks[10].split(";")
-        nteams = tks[7]
+        name = tks[2].rstrip()
+        preferences = tks[7]
+        areas = tks[11].replace(", ", ";").split(";")
+        nteams = tks[8]
         mentor = Mentor(name, areas, preferences, nteams)
-        mentors.append(mentor)
+        mentors[name] = mentor
 
     return mentors
 
 
 def extract_teams(teams_file):
-    lines = read_file(teams_file)
-    teams = []
+    lines = read_file(teams_file, 1)
+    teams = {}
     for (i, m) in enumerate(lines):
         tks = m.split("\t")
         if len(tks) != 72:
-            print(tks)
             print("Can't parse line %s in file `%s`" % (i, teams_file))
             sys.exit(1)
 
-        name = tks[2]
-        area = tks[-1].split(";")
-        stage = tks[-8]
+        name = tks[2].rstrip()
+        area = tks[-1].replace(",", ";").split(";")
+        stage = tks[-9]
         team = Team(name, area, stage)
-        teams.append(team)
+        teams[name] = team
 
     return teams
 
-def make_graph(mentors, teams):
+def extract_initial(initial_file):
+    lines = read_file(initial_file, 0)
+    initial = set()
+    for (i, l) in enumerate(lines):
+        tks = l.split("\t")
+        if len(tks) != 2:
+            print("Can't parse line %s in file `%s`" % (i, initial_file))
+            sys.exit(1)
+
+        team = tks[0]
+        mentor = tks[1]
+        initial.add((mentor, team))
+
+    return initial
+
+def make_graph(mentors, teams, initial=set()):
     graph = {}
-    for m in mentors:
-        for t in teams:
+    for m in mentors.values():
+        for t in teams.values():
             # create an edge between a mentor and a team, if and only
             # if the mentor has expertise in one of the team's area and the
             # stage of the team is in the mentor's preference
@@ -103,14 +134,24 @@ def make_graph(mentors, teams):
                 graph[(t, m)] = edmonds_karp.Edge(1, 0)
                 graph[(m, t)] = edmonds_karp.Edge(1, 1)
 
-    for t in teams:
-        graph[("src", t)] = edmonds_karp.Edge(2, 0)
-        graph[(t, "src")] = edmonds_karp.Edge(2, 2)
+    # fill up initial matches
+    for (m, t) in initial:
+        t = teams[t]
+        m = mentors[m]
+        graph[(t, m)] = edmonds_karp.Edge(1, 1)
+        graph[(m, t)] = edmonds_karp.Edge(0, 0)
 
-    # TODO: mentors can have multiple teams
-    for m in mentors:
-        graph[(m, "dst")] = edmonds_karp.Edge(m.nteams, 0)
-        graph[("dst", m)] = edmonds_karp.Edge(m.nteams, m.nteams)
+        t.match += 1
+        m.match += 1
+
+    for t in teams.values():
+        graph[("src", t)] = edmonds_karp.Edge(t.nmentors, t.match)
+        graph[(t, "src")] = edmonds_karp.Edge(t.nmentors, t.nmentors)
+
+    for m in mentors.values():
+        nteams = max(min(1, m.nteams), m.match)
+        graph[(m, "dst")] = edmonds_karp.Edge(nteams, m.match)
+        graph[("dst", m)] = edmonds_karp.Edge(nteams, nteams)
 
     return graph
 
@@ -124,18 +165,44 @@ def main(argv):
 
     mentors = extract_mentors(FLAGS.mentors)
     teams = extract_teams(FLAGS.teams)
-    graph = make_graph(mentors, teams)
+    initial = extract_initial(FLAGS.initial)
+    graph = make_graph(mentors, teams, initial)
 
-    flow = edmonds_karp.max_flow("src", "dst", graph)
+    flow = edmonds_karp.max_flow("src", "dst", graph, len(initial))
+    if flow < MENTORS_PER_TEAM * len(teams):
+        for m in mentors.values():
+            e = (m, "dst")
+            nteams = min(MAX_TEAMS_PER_MENTOR, m.nteams, graph[e].cap + 1)
+            graph[e].cap = nteams
+        flow = edmonds_karp.max_flow("src", "dst", graph, flow)
 
     print("%20s\t%40s" % ("Team", "Mentor"))
-    for t in teams:
-        for m in mentors:
+    for t in teams.values():
+        for m in mentors.values():
             e = (t, m)
             if e in graph and graph[e].flow > 0:
                 print("%20s\t%40s" % (t, m))
 
-    print("Matched %s out of %s" % (flow, 2*len(teams)))
+    # some mentor stats
+    unmatched = []
+    two_teams = 0
+    many_teams = 0
+    for m in mentors.values():
+        e = (m, "dst")
+        if graph[e].flow == 0:
+            unmatched.append(m)
+        if graph[e].flow == 2:
+            two_teams += 1
+        if graph[e].flow > 2:
+            many_teams += 1
+
+    print("Matched %s out of %s" % (flow, MENTORS_PER_TEAM*len(teams)))
+    print("Unmatched mentors: %s %s" % (len(unmatched), unmatched))
+    print("Mentors with two teams: %s" % two_teams)
+    print("Mentors with many teams: %s" % many_teams)
+
+
+
 
 if __name__ == '__main__':
     main(sys.argv)

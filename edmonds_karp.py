@@ -7,15 +7,16 @@ class Edge:
         return self.cap - self.flow
 
 
-def max_flow(src, dst, graph):
-    flow = 0
+def max_flow(src, dst, graph, initial_flow=0):
+    flow = initial_flow
     while True:
         path = bfs(src, dst, graph)
         if not path:
             break
-        edges = zip(path[:-1], path[1:])
+        edges = [e for e in zip(path[:-1], path[1:])]
 
         df = min([graph[e].left() for e in edges])
+
         for s, t in edges:
             graph[(s, t)].flow += df
             graph[(t, s)].flow -= df
