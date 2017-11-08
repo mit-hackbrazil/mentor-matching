@@ -24,5 +24,9 @@ cada equipe receba um mentor dentro da sua área de atuação.
 ## Modo de usar
 
 ```
-python match.py --mentors mentors.txt --teams teams.txt
+python match.py --mentors mentors.txt --teams teams.txt --initial initial.txt
 ```
+
+`mentors.txt` and `teams.txt` contains tab-separated information from mentors and teams,
+respectively. `initial.txt` contains an fixed initial matching between some mentors and
+teams.
